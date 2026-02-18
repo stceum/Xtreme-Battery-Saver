@@ -323,6 +323,20 @@ enable_pwr_save() {
 	notif "Enabling XtremeBS..."
 	log_msg 1 "Enabling XtremeBS"
     fi
+
+    # Handle mi_thermald
+    if [ "$disable_mi_thermald" = "true" ]; then
+	if [ $(status_mi_thermald) = "true" ]; then
+	    log_msg 3 "Stopping mi_thermald..."
+	    stop_mi_thermald
+	fi
+    else
+	if [ $(status_mi_thermald) = "false" ]; then
+	    log_msg 3 "Starting mi_thermald..."
+	    start_mi_thermald
+	fi
+    fi
+
     # Handle Apps
     if [ "$handle_apps" != "false" ]; then
 	for app in $(pm list packages -3 | cut -d: -f2- && [ -s "$denylist" ] && cat "$denylist"); do
@@ -383,7 +397,7 @@ enable_pwr_save() {
 	if [ -n "$RFKILL_CMD" ]; then
 	    log_msg 3 "Attempting to block with: $RFKILL_CMD"
 	    "$RFKILL_CMD" block wifi
-	    
+
 	    # Check if rfkill actually worked, if not, use svc as a final fallback
 	    if [ "$("$RFKILL_CMD" list wifi | grep Soft | cut -d: -f2 | cut -d' ' -f2)" != "yes" ]; then
 		log_msg 3 "rfkill failed to block. Falling back to svc."
@@ -461,6 +475,20 @@ disable_pwr_save() {
 	notif "Disabling XtremeBS..."
 	log_msg 1 "Disabling XtremeBS"
     fi
+
+    # Handle mi_thermald
+    if [ "$disable_mi_thermald" = "true" ]; then
+	if [ $(status_mi_thermald) = "true" ]; then
+	    log_msg 3 "Stopping mi_thermald..."
+	    stop_mi_thermald
+	fi
+    else
+	if [ $(status_mi_thermald) = "false" ]; then
+	    log_msg 3 "Starting mi_thermald..."
+	    start_mi_thermald
+	fi
+    fi
+
     # Handle Cores
 
     if [ "$handle_cores" != "false" ] || [ "$disable_cores" != "false" ]; then
@@ -518,7 +546,7 @@ disable_pwr_save() {
 	if [ -n "$RFKILL_CMD" ]; then
 	    log_msg 3 "Attempting to unblock with: $RFKILL_CMD"
 	    "$RFKILL_CMD" unblock wifi
-	    
+
 	    # Check if rfkill actually worked, if not, use svc as a final fallback
 	    if [ "$("$RFKILL_CMD" list wifi | grep Soft | cut -d: -f2 | cut -d' ' -f2)" != "no" ]; then
 		log_msg 3 "rfkill failed to unblock. Falling back to svc."
@@ -581,6 +609,23 @@ disable_pwr_save() {
     update_status
 }
 
+stop_mi_thermald() {
+    setprop ctl.stop mi_thermald
+}
+
+start_mi_thermald() {
+    setprop ctl.restart mi_thermald
+}
+
+status_mi_thermald() {
+    res=$(getprop init.svc.mi_thermald)
+    if [ "$res" = "running" ]; then
+	echo true
+    else
+	echo false
+    fi
+}
+
 # Event stuff for V2
 
 is_event_locked() {
@@ -591,6 +636,64 @@ is_event_locked() {
 	fi
     done
     return 0
+}
+
+save_parameters() {
+    # prev_quit="${quit}"
+    # prev_handle_cores="${handle_cores}"
+    # prev_disable_cores="${disable_cores}"
+    # prev_handle_apps="${handle_apps}"
+    # prev_allowlist="${allowlist}"
+    # prev_denylist="${denylist}"
+    # prev_handle_proc="${handle_proc}"
+    # prev_proc_file="${proc_file}"
+    # prev_handle_gms="${handle_gms}"
+    # prev_low_ram="${low_ram}"
+    # prev_doze="${doze}"
+    # prev_kill_wifi="${kill_wifi}"
+    prev_disable_mi_thermald="${disable_mi_thermald}"
+}
+
+recover_parameters() {
+    # if [ ! -z "${prev_quit}"  ] ; then quit="${prev_quit}" ; fi
+    # if [ ! -z "${prev_handle_cores}"  ] ; then handle_cores="${prev_handle_cores}" ; fi
+    # if [ ! -z "${prev_disable_cores}"  ] ; then disable_cores="${prev_disable_cores}" ; fi
+    # if [ ! -z "${prev_handle_apps}"  ] ; then handle_apps="${prev_handle_apps}" ; fi
+    # if [ ! -z "${prev_allowlist}"  ] ; then allowlist="${prev_allowlist}" ; fi
+    # if [ ! -z "${prev_denylist}"  ] ; then denylist="${prev_denylist}" ; fi
+    # if [ ! -z "${prev_handle_proc}"  ] ; then handle_proc="${prev_handle_proc}" ; fi
+    # if [ ! -z "${prev_proc_file}"  ] ; then proc_file="${prev_proc_file}" ; fi
+    # if [ ! -z "${prev_handle_gms}"  ] ; then handle_gms="${prev_handle_gms}" ; fi
+    # if [ ! -z "${prev_low_ram}"  ] ; then low_ram="${prev_low_ram}" ; fi
+    # if [ ! -z "${prev_doze}"  ] ; then doze="${prev_doze}" ; fi
+    # if [ ! -z "${prev_kill_wifi}"  ] ; then kill_wifi="${prev_kill_wifi}" ; fi
+    if [ ! -z "${prev_disable_mi_thermald}"  ] ; then disable_mi_thermald="${prev_disable_mi_thermald}" ; fi
+}
+
+last_ele_of_arr() {
+    arr="$@"
+    indexes=( "${!arr[@]}" )
+    lastindex=${indexes[-1]}
+    echo "${arr[$lastindex]}"
+    unset lastindex
+    unset indexes
+    unset arr
+}
+
+log_settings() {
+    log_msg 3 "setting: quit=$quit handle_cores=$handle_cores \
+disable_cores=$disable_cores handle_apps=$handle_apps allowlist=$allowlist \
+denylist=$denylist handle_proc=$handle_proc proc_file=$proc_file \
+handle_gms=$handle_gms low_ram=$low_ram doze=$doze \
+kill_wifi=$kill_wifi disable_mi_thermald=$disable_mi_thermald"
+}
+
+log_saved_settings() {
+    log_msg 3 "saved setting: prev_quit=$quit prev_handle_cores=$handle_cores \
+prev_disable_cores=$disable_cores prev_handle_apps=$handle_apps prev_allowlist=$allowlist \
+prev_denylist=$denylist prev_handle_proc=$handle_proc prev_proc_file=$proc_file \
+prev_handle_gms=$handle_gms prev_low_ram=$low_ram prev_doze=$doze \
+prev_kill_wifi=$kill_wifi prev_disable_mi_thermald=$disable_mi_thermald"
 }
 
 handle_event() {
@@ -605,10 +708,17 @@ handle_event() {
 	    log_msg 2 "$event was triggered but it is currently enabled"
 	    # return early
 	    return 1
-	else
-	    # lock the event
-	    active_events+=( "$event" )
 	fi
+
+	# if flag=1 save parameters if flag=0 recover them
+	if [ "$(last_ele_of_arr ${active_events[@]})" = "boot" ]; then
+	    log_msg 3 "saving boot parameters..."
+	    save_parameters
+	    log_saved_settings
+	fi
+
+	# lock the event
+	active_events+=( "$event" )
     fi
 
     # set everything to false
@@ -624,6 +734,7 @@ handle_event() {
     low_ram=false
     doze=false
     kill_wifi=false
+    disable_mi_thermald=false
 
     log_msg 3 "Parsing the config for $event event"
 
@@ -692,6 +803,10 @@ handle_event() {
 		if [ "$val" = "true" ]; then
 		    kill_wifi="true"
 		fi;;
+	    disable_mi_thermald)
+		if [ "$val" = "true" ]; then
+		    disable_mi_thermald="true"
+		fi ;;
 	esac
     done < <(grep -A99 "$event={" "$conf")
 
@@ -708,16 +823,23 @@ handle_event() {
     # is probably coming in a later update
     if [ "$flag" = 0 ]; then
 	log_msg 1 "Undoing actions for $event"
-	disable_pwr_save
 	# remove from active_events
 	for i in ${!active_events[@]}; do
 	    if [ "${active_events[$i]}" = "$event" ]; then
 		unset "active_events[$i]"
 	    fi
 	done
+	if [ "$(last_ele_of_arr ${active_events[@]})" = "boot" ]; then
+	    log_msg 3 "recoverring boot parameters..."
+	    log_saved_settings
+	    recover_parameters
+	fi
+	log_settings
+	disable_pwr_save
 	log_msg 1 "Actions for $event undone"
     else
 	log_msg 1 "Performing actions for $event event"
+	log_settings
 	enable_pwr_save
 	log_msg 1 "Actions for $event completed"
 	if [ "$event" = "boot" ] && \
